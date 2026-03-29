@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Kreallery</title>
+
+<style>
+
+/* RESET */
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  font-family: monospace, sans-serif;
+  background: #f5f5f5;
+}
+
+/* HEADER */
+h1 {
+  text-align: center;
+  font-size: 20px;
+  margin: 10px 0;
+}
+
+/* SEARCH */
+#searchBox {
+  position: sticky;
+  top: 0;
+  width: 90%;
+  display: flex;
+  margin: 0 auto 10px;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  border-bottom: 1px solid #ddd;
+  font-size: 0.875rem;
+  font-family: monospace, sans-serif;
+  font-style: italic;
+}
+
+/* GRID */
+#albums, #gallery {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  width: 90%;
+  margin: 0 auto;
+}
+
+@media (min-width: 600px) {
+  #albums, #gallery {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* CARD */
+.card {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  text-align: center;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* IMAGE */
+.card img {
+  width: 100%;
+  height: 120px;
+  object-fit: contain;
+  background: #eee;
+}
+
+/* TEXT */
+.title {
+  font-size: 13px;
+  padding: 6px;
+  font-weight: bold;
+}
+
+.filename {
+  font-size: 11px;
+  color: #555;
+  padding: 0 5px 8px;
+  word-break: break-word;
+}
+
+/* BACK */
+#back {
+  display: none;
+  padding: 10px;
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+  width: 90%;
+  margin: 0 auto 10px;
+  border-radius: 12px;
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+/* LIGHTBOX */
+#lightbox {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: black;
+  display: none;
+  justify-content: center;
+  align-items: center;
+}
+
+/* IMAGE */
+#lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* BOTTOM SHEET */
+#sheet {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  background: #111;
+  color: white;
+  text-align: center;
+  padding: 10px;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>Kreatif Gallery</h1>
+
+<input id="searchBox" placeholder="cari gambar (tahun)...">
+
+<div id="back">⬅ Back</div>
+
+<div id="albums"></div>
+<div id="gallery" style="display:none;"></div>
+
+<!-- LIGHTBOX -->
+<div id="lightbox">
+  <img id="lightboxImg">
+  <div id="sheet"></div>
+</div>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbzOqHNqoct7B3rQkzEZ4L1wjodpEc9qxLSYWz0xJjSNysoneRJwHZEkfuqKBG8Ns9zf/exec";
+
+let allAlbums = [];
+let currentAlbum = null;
+let currentImages = [];
+let currentIndex = 0;
+
+/* LOAD */
+async function load() {
+  const res = await fetch(API_URL);
+  allAlbums = await res.json();
+  renderAlbums(allAlbums);
+}
+
+/* ALBUMS */
+function renderAlbums(albums) {
+  const el = document.getElementById("albums");
+  el.innerHTML = "";
+
+  albums.forEach(album => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const cover = album.images[0]?.thumb || "";
+
+    card.innerHTML = `
+      <img src="${cover}">
+      <div class="title">${album.name}</div>
+    `;
+
+    card.onclick = () => openAlbum(album);
+    el.appendChild(card);
+  });
+}
+
+/* OPEN ALBUM */
+function openAlbum(album) {
+  currentAlbum = album;
+
+  document.getElementById("albums").style.display = "none";
+  document.getElementById("gallery").style.display = "grid";
+  document.getElementById("back").style.display = "block";
+
+  renderImages(album.images);
+}
+
+/* IMAGES */
+function renderImages(images) {
+  currentImages = images;
+
+  const el = document.getElementById("gallery");
+  el.innerHTML = "";
+
+  images.forEach((img, index) => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    card.innerHTML = `
+      <img src="${img.thumb}">
+      <div class="filename">${img.name}</div>
+    `;
+
+    card.onclick = () => openLightbox(index);
+    el.appendChild(card);
+  });
+}
+
+/* BACK */
+document.getElementById("back").onclick = () => {
+  currentAlbum = null;
+  document.getElementById("albums").style.display = "grid";
+  document.getElementById("gallery").style.display = "none";
+  document.getElementById("back").style.display = "none";
+};
+
+/* SEARCH */
+document.getElementById("searchBox").addEventListener("input", function() {
+  const q = this.value.toLowerCase();
+
+  if (currentAlbum) {
+    renderImages(currentAlbum.images.filter(i =>
+      i.name.toLowerCase().includes(q)
+    ));
+  } else {
+    renderAlbums(allAlbums.filter(a =>
+      a.name.toLowerCase().includes(q) ||
+      a.images.some(i => i.name.toLowerCase().includes(q))
+    ));
+  }
+});
+
+/* LIGHTBOX */
+function openLightbox(index) {
+  currentIndex = index;
+  showImage();
+  document.getElementById("lightbox").style.display = "flex";
+}
+
+function showImage() {
+  const img = currentImages[currentIndex];
+  const el = document.getElementById("lightboxImg");
+
+  el.src = img.full;
+  el.style.transform = "scale(1)";
+  document.getElementById("sheet").innerText = img.name;
+}
+
+/* CLOSE */
+document.getElementById("lightbox").onclick = (e) => {
+  if (e.target.id === "lightbox") {
+    document.getElementById("lightbox").style.display = "none";
+  }
+};
+
+/* SWIPE */
+let startX = 0;
+
+document.getElementById("lightbox").addEventListener("touchstart", e => {
+  startX = e.touches[0].clientX;
+});
+
+document.getElementById("lightbox").addEventListener("touchend", e => {
+  let endX = e.changedTouches[0].clientX;
+  let diff = startX - endX;
+
+  if (Math.abs(diff) > 50) {
+    if (diff > 0 && currentIndex < currentImages.length - 1) {
+      currentIndex++;
+    } else if (diff < 0 && currentIndex > 0) {
+      currentIndex--;
+    }
+    showImage();
+  }
+});
+
+/* ZOOM (scroll / touchpad) */
+let scale = 1;
+
+document.getElementById("lightboxImg").addEventListener("wheel", e => {
+  e.preventDefault();
+  scale += e.deltaY * -0.001;
+  scale = Math.min(Math.max(1, scale), 4);
+  e.target.style.transform = `scale(${scale})`;
+});
+
+load();
+</script>
+
+</body>
+</html>
