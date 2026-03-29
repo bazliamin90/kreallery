@@ -121,6 +121,20 @@ h1 {
   object-fit: contain;
 }
 
+/* CLOSE BUTTON */
+#closeBtn {
+  position: absolute;
+  top: 15px;
+  right: 20px;
+  color: white;
+  background-color: #555;
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: 1rem;
+  z-index: 10;
+  cursor: pointer;
+}
+
 /* BOTTOM SHEET */
 #sheet {
   position: absolute;
@@ -137,7 +151,7 @@ h1 {
 
 <body>
 
-<h1>Kreatif Gallery</h1>
+<h1 onclick="goHome()">Kreatif Gallery</h1>
 
 <input id="searchBox" placeholder="cari gambar (tahun)...">
 
@@ -148,6 +162,7 @@ h1 {
 
 <!-- LIGHTBOX -->
 <div id="lightbox">
+  <div id="closeBtn" onclick="closeLightbox()">✕</div>
   <img id="lightboxImg">
   <div id="sheet"></div>
 </div>
@@ -165,6 +180,14 @@ async function load() {
   const res = await fetch(API_URL);
   allAlbums = await res.json();
   renderAlbums(allAlbums);
+}
+
+/* GO HOME (CLICK TITLE) */
+function goHome() {
+  currentAlbum = null;
+  document.getElementById("albums").style.display = "grid";
+  document.getElementById("gallery").style.display = "none";
+  document.getElementById("back").style.display = "none";
 }
 
 /* ALBUMS */
@@ -221,12 +244,7 @@ function renderImages(images) {
 }
 
 /* BACK */
-document.getElementById("back").onclick = () => {
-  currentAlbum = null;
-  document.getElementById("albums").style.display = "grid";
-  document.getElementById("gallery").style.display = "none";
-  document.getElementById("back").style.display = "none";
-};
+document.getElementById("back").onclick = () => goHome();
 
 /* SEARCH */
 document.getElementById("searchBox").addEventListener("input", function() {
@@ -260,12 +278,10 @@ function showImage() {
   document.getElementById("sheet").innerText = img.name;
 }
 
-/* CLOSE */
-document.getElementById("lightbox").onclick = (e) => {
-  if (e.target.id === "lightbox") {
-    document.getElementById("lightbox").style.display = "none";
-  }
-};
+/* CLOSE BUTTON */
+function closeLightbox() {
+  document.getElementById("lightbox").style.display = "none";
+}
 
 /* SWIPE */
 let startX = 0;
@@ -288,7 +304,7 @@ document.getElementById("lightbox").addEventListener("touchend", e => {
   }
 });
 
-/* ZOOM (scroll / touchpad) */
+/* ZOOM */
 let scale = 1;
 
 document.getElementById("lightboxImg").addEventListener("wheel", e => {
