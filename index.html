@@ -6,8 +6,6 @@
 <title>Kreallery</title>
 
 <style>
-
-/* RESET */
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
@@ -19,7 +17,6 @@ body {
   background: #f5f5f5;
 }
 
-/* HEADER */
 h1 {
   text-align: center;
   font-size: 20px;
@@ -27,19 +24,34 @@ h1 {
 }
 
 /* SEARCH */
-#searchBox {
+#searchWrap {
   position: sticky;
   top: 0;
   width: 90%;
-  display: flex;
   margin: 0 auto 10px;
+  display: flex;
+  gap: 5px;
+}
+
+#searchBox {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+  font-size: 0.7rem;
+  font-family: monospace;
+  font-style: italic;
+}
+
+.btn {
   padding: 12px;
   border: none;
   border-radius: 12px;
-  border-bottom: 1px solid #ddd;
-  font-size: 0.875rem;
-  font-family: monospace, sans-serif;
-  font-style: italic;
+  background: #333;
+  color: white;
+  font-size: 0.7rem;
+  font-family: monospace;
+  cursor: pointer;
 }
 
 /* GRID */
@@ -57,7 +69,6 @@ h1 {
   }
 }
 
-/* CARD */
 .card {
   background: white;
   border-radius: 12px;
@@ -66,7 +77,6 @@ h1 {
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-/* IMAGE */
 .card img {
   width: 100%;
   height: 120px;
@@ -74,7 +84,6 @@ h1 {
   background: #eee;
 }
 
-/* TEXT */
 .title {
   font-size: 13px;
   padding: 6px;
@@ -88,7 +97,6 @@ h1 {
   word-break: break-word;
 }
 
-/* BACK */
 #back {
   display: none;
   padding: 10px;
@@ -98,8 +106,9 @@ h1 {
   margin: 0 auto 10px;
   border-radius: 12px;
   text-align: center;
-  font-size: 0.875rem;
 }
+
+
 
 /* LIGHTBOX */
 #lightbox {
@@ -112,47 +121,66 @@ h1 {
   display: none;
   justify-content: center;
   align-items: center;
+  overflow: hidden;
 }
 
-/* IMAGE */
 #lightbox img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  touch-action: none; /* 🔥 required for gestures */
+  cursor: grab;
+  user-select: none;
 }
 
-/* CLOSE BUTTON */
+/* CLOSE */
 #closeBtn {
   position: absolute;
   top: 15px;
   right: 20px;
   color: white;
-  background-color: #555;
+  background: #555;
   border-radius: 5px;
   padding: 5px 10px;
-  font-size: 1rem;
-  z-index: 10;
   cursor: pointer;
 }
 
+/* NAV */
 #prevBtn, #nextBtn {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
   font-size: 30px;
   color: white;
-  background-color: #555;
+  background: #555;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.5);
   opacity: 0.2;
   padding: 10px;
   cursor: pointer;
-  user-select: none;
   z-index: 10;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.4);
 }
 
 #prevBtn { left: 10px; }
 #nextBtn { right: 10px; }
+
+/* ZOOM BUTTONS (ON TOP) */
+#zoomControls {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  gap: 10px;
+  z-index: 10;
+}
+
+.zoomBtn {
+  background: rgba(0,0,0,0.6);
+  color: white;
+  border-radius: 50%;
+  cursor: pointer;
+  background: #555;
+  border-radius: 5px;
+  padding: 5px 10px;
+}
 
 /* BOTTOM SHEET */
 #sheet {
@@ -164,7 +192,6 @@ h1 {
   text-align: center;
   padding: 10px;
 }
-
 </style>
 </head>
 
@@ -172,7 +199,11 @@ h1 {
 
 <h1 onclick="goHome()">Kreatif Gallery</h1>
 
-<input id="searchBox" placeholder="cari gambar (tahun)...">
+<div id="searchWrap">
+  <input id="searchBox" placeholder="cari gambar (tahun)...">
+  <button class="btn" onclick="doSearch()">go</button>
+  <button class="btn" onclick="resetSearch()">reset</button>
+</div>
 
 <div id="back">⬅ Back</div>
 
@@ -184,6 +215,12 @@ h1 {
   <div id="closeBtn" onclick="closeLightbox()">✕</div>
   <div id="prevBtn">❮</div>
   <div id="nextBtn">❯</div>
+
+  <div id="zoomControls">
+    <div class="zoomBtn" onclick="zoomIn()">＋</div>
+    <div class="zoomBtn" onclick="zoomOut()">－</div>
+  </div>
+
   <img id="lightboxImg">
   <div id="sheet"></div>
 </div>
@@ -196,22 +233,20 @@ let currentAlbum = null;
 let currentImages = [];
 let currentIndex = 0;
 
-/* ================= LOAD ================= */
 async function load() {
   const res = await fetch(API_URL);
   allAlbums = await res.json();
   renderAlbums(allAlbums);
 }
 
-/* ================= HOME ================= */
 function goHome() {
   currentAlbum = null;
+  renderAlbums(allAlbums);
   document.getElementById("albums").style.display = "grid";
   document.getElementById("gallery").style.display = "none";
   document.getElementById("back").style.display = "none";
 }
 
-/* ================= ALBUMS ================= */
 function renderAlbums(albums) {
   const el = document.getElementById("albums");
   el.innerHTML = "";
@@ -222,31 +257,22 @@ function renderAlbums(albums) {
 
     const cover = album.images[0]?.thumb || "";
 
-    card.innerHTML = `
-      <img src="${cover}">
-      <div class="title">${album.name}</div>
-    `;
-
+    card.innerHTML = `<img src="${cover}"><div class="title">${album.name}</div>`;
     card.onclick = () => openAlbum(album);
     el.appendChild(card);
   });
 }
 
-/* ================= OPEN ALBUM ================= */
 function openAlbum(album) {
   currentAlbum = album;
-
   document.getElementById("albums").style.display = "none";
   document.getElementById("gallery").style.display = "grid";
   document.getElementById("back").style.display = "block";
-
   renderImages(album.images);
 }
 
-/* ================= IMAGES ================= */
 function renderImages(images) {
   currentImages = images;
-
   const el = document.getElementById("gallery");
   el.innerHTML = "";
 
@@ -254,22 +280,17 @@ function renderImages(images) {
     const card = document.createElement("div");
     card.className = "card";
 
-    card.innerHTML = `
-      <img src="${img.thumb}">
-      <div class="filename">${img.name}</div>
-    `;
-
+    card.innerHTML = `<img src="${img.thumb}"><div class="filename">${img.name}</div>`;
     card.onclick = () => openLightbox(index);
     el.appendChild(card);
   });
 }
 
-/* ================= BACK ================= */
-document.getElementById("back").onclick = () => goHome();
+document.getElementById("back").onclick = goHome;
 
-/* ================= SEARCH ================= */
-document.getElementById("searchBox").addEventListener("input", function() {
-  const q = this.value.toLowerCase();
+/* SEARCH */
+function doSearch() {
+  const q = document.getElementById("searchBox").value.toLowerCase();
 
   if (currentAlbum) {
     renderImages(currentAlbum.images.filter(i =>
@@ -281,9 +302,14 @@ document.getElementById("searchBox").addEventListener("input", function() {
       a.images.some(i => i.name.toLowerCase().includes(q))
     ));
   }
-});
+}
 
-/* ================= LIGHTBOX ================= */
+function resetSearch() {
+  document.getElementById("searchBox").value = "";
+  goHome();
+}
+
+/* LIGHTBOX */
 const lightbox = document.getElementById("lightbox");
 const imgEl = document.getElementById("lightboxImg");
 
@@ -293,7 +319,6 @@ let startY = 0;
 let currentX = 0;
 let currentY = 0;
 let isDragging = false;
-let lastTap = 0;
 
 function openLightbox(index) {
   currentIndex = index;
@@ -307,24 +332,86 @@ function closeLightbox() {
 
 function showImage() {
   const img = currentImages[currentIndex];
-
   scale = 1;
   currentX = 0;
   currentY = 0;
 
-  imgEl.style.transform = "translate(0px,0px) scale(1)";
+  imgEl.style.transform = "translate(0,0) scale(1)";
   imgEl.src = img.full;
-
   document.getElementById("sheet").innerText = img.name;
 }
 
-/* CLOSE when clicking background */
-lightbox.addEventListener("click", (e) => {
-  if (e.target.id === "lightbox") {
-    closeLightbox();
+/* ZOOM */
+function zoomIn() {
+  scale = Math.min(scale + 0.5, 4);
+  updateTransform();
+}
+
+function zoomOut() {
+  scale = Math.max(scale - 0.5, 1);
+  if (scale === 1) {
+    currentX = 0;
+    currentY = 0;
   }
+  updateTransform();
+}
+
+function updateTransform() {
+  imgEl.style.transform =
+    `translate(${currentX}px, ${currentY}px) scale(${scale})`;
+}
+
+/* MOUSE PAN */
+imgEl.addEventListener("mousedown", e => {
+  if (scale === 1) return;
+  isDragging = true;
+  startX = e.clientX;
+  startY = e.clientY;
+  imgEl.style.cursor = "grabbing";
 });
 
+window.addEventListener("mousemove", e => {
+  if (!isDragging) return;
+
+  currentX += e.clientX - startX;
+  currentY += e.clientY - startY;
+
+  updateTransform();
+
+  startX = e.clientX;
+  startY = e.clientY;
+});
+
+window.addEventListener("mouseup", () => {
+  isDragging = false;
+  imgEl.style.cursor = "grab";
+});
+
+/* TOUCH PAN */
+imgEl.addEventListener("touchstart", e => {
+  if (scale === 1) return;
+  startX = e.touches[0].clientX;
+  startY = e.touches[0].clientY;
+  isDragging = true;
+});
+
+imgEl.addEventListener("touchmove", e => {
+  if (!isDragging) return;
+
+  currentX += e.touches[0].clientX - startX;
+  currentY += e.touches[0].clientY - startY;
+
+  updateTransform();
+
+  startX = e.touches[0].clientX;
+  startY = e.touches[0].clientY;
+});
+
+imgEl.addEventListener("touchend", () => {
+  isDragging = false;
+});
+
+/* NAV */
 document.getElementById("prevBtn").onclick = () => {
   if (currentIndex > 0) {
     currentIndex--;
@@ -339,115 +426,6 @@ document.getElementById("nextBtn").onclick = () => {
   }
 };
 
-/* ================= TOUCH START ================= */
-lightbox.addEventListener("touchstart", e => {
-  if (e.touches.length === 1) {
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    isDragging = true;
-  }
-});
-
-/* ================= TOUCH MOVE ================= */
-lightbox.addEventListener("touchmove", e => {
-  if (!isDragging) return;
-
-  let x = e.touches[0].clientX;
-  let y = e.touches[0].clientY;
-
-  let dx = x - startX;
-  let dy = y - startY;
-
-  /* PAN when zoomed */
-  if (scale > 1) {
-    e.preventDefault();
-
-    currentX += dx;
-    currentY += dy;
-
-    imgEl.style.transform =
-      `translate(${currentX}px, ${currentY}px) scale(${scale})`;
-
-    startX = x;
-    startY = y;
-  }
-});
-
-/* ================= TOUCH END ================= */
-lightbox.addEventListener("touchend", e => {
-  if (!isDragging) return;
-
-  let endX = e.changedTouches[0].clientX;
-  let diff = startX - endX;
-
-  /* SWIPE only when not zoomed */
-  if (scale === 1 && Math.abs(diff) > 50) {
-    if (diff > 0 && currentIndex < currentImages.length - 1) {
-      currentIndex++;
-    } else if (diff < 0 && currentIndex > 0) {
-      currentIndex--;
-    }
-    showImage();
-  }
-
-  isDragging = false;
-
-  /* DOUBLE TAP */
-  let now = new Date().getTime();
-  let gap = now - lastTap;
-
-  if (gap < 300 && gap > 0) {
-    if (scale === 1) {
-      scale = 2;
-    } else {
-      scale = 1;
-      currentX = 0;
-      currentY = 0;
-    }
-
-    imgEl.style.transform =
-      `translate(${currentX}px, ${currentY}px) scale(${scale})`;
-  }
-
-  lastTap = now;
-});
-
-/* ================= WHEEL ZOOM ================= */
-imgEl.addEventListener("wheel", e => {
-  e.preventDefault();
-
-  scale += e.deltaY * -0.001;
-  scale = Math.min(Math.max(1, scale), 4);
-
-  imgEl.style.transform =
-    `translate(${currentX}px, ${currentY}px) scale(${scale})`;
-});
-
-/* ================= KEYBOARD NAVIGATION ================= */
-document.addEventListener("keydown", (e) => {
-  // only work when lightbox is open
-  if (lightbox.style.display !== "flex") return;
-
-  if (e.key === "ArrowRight") {
-    if (currentIndex < currentImages.length - 1) {
-      currentIndex++;
-      showImage();
-    }
-  }
-
-  if (e.key === "ArrowLeft") {
-    if (currentIndex > 0) {
-      currentIndex--;
-      showImage();
-    }
-  }
-
-  if (e.key === "Escape") {
-    closeLightbox();
-  }
-});
-
-/* ================= START ================= */
 load();
 </script>
 
