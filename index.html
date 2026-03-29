@@ -119,6 +119,7 @@ h1 {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+  touch-action: none; /* 🔥 required for gestures */
 }
 
 /* CLOSE BUTTON */
@@ -134,6 +135,20 @@ h1 {
   z-index: 10;
   cursor: pointer;
 }
+
+#prevBtn, #nextBtn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 30px;
+  color: white;
+  padding: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+#prevBtn { left: 10px; }
+#nextBtn { right: 10px; }
 
 /* BOTTOM SHEET */
 #sheet {
@@ -163,6 +178,8 @@ h1 {
 <!-- LIGHTBOX -->
 <div id="lightbox">
   <div id="closeBtn" onclick="closeLightbox()">✕</div>
+  <div id="prevBtn">❮</div>
+  <div id="nextBtn">❯</div>
   <img id="lightboxImg">
   <div id="sheet"></div>
 </div>
@@ -175,14 +192,14 @@ let currentAlbum = null;
 let currentImages = [];
 let currentIndex = 0;
 
-/* LOAD */
+/* ================= LOAD ================= */
 async function load() {
   const res = await fetch(API_URL);
   allAlbums = await res.json();
   renderAlbums(allAlbums);
 }
 
-/* GO HOME (CLICK TITLE) */
+/* ================= HOME ================= */
 function goHome() {
   currentAlbum = null;
   document.getElementById("albums").style.display = "grid";
@@ -190,7 +207,7 @@ function goHome() {
   document.getElementById("back").style.display = "none";
 }
 
-/* ALBUMS */
+/* ================= ALBUMS ================= */
 function renderAlbums(albums) {
   const el = document.getElementById("albums");
   el.innerHTML = "";
@@ -211,7 +228,7 @@ function renderAlbums(albums) {
   });
 }
 
-/* OPEN ALBUM */
+/* ================= OPEN ALBUM ================= */
 function openAlbum(album) {
   currentAlbum = album;
 
@@ -222,7 +239,7 @@ function openAlbum(album) {
   renderImages(album.images);
 }
 
-/* IMAGES */
+/* ================= IMAGES ================= */
 function renderImages(images) {
   currentImages = images;
 
@@ -243,10 +260,10 @@ function renderImages(images) {
   });
 }
 
-/* BACK */
+/* ================= BACK ================= */
 document.getElementById("back").onclick = () => goHome();
 
-/* SEARCH */
+/* ================= SEARCH ================= */
 document.getElementById("searchBox").addEventListener("input", function() {
   const q = this.value.toLowerCase();
 
@@ -262,39 +279,105 @@ document.getElementById("searchBox").addEventListener("input", function() {
   }
 });
 
-/* LIGHTBOX */
+/* ================= LIGHTBOX ================= */
+const lightbox = document.getElementById("lightbox");
+const imgEl = document.getElementById("lightboxImg");
+
+let scale = 1;
+let startX = 0;
+let startY = 0;
+let currentX = 0;
+let currentY = 0;
+let isDragging = false;
+let lastTap = 0;
+
 function openLightbox(index) {
   currentIndex = index;
   showImage();
-  document.getElementById("lightbox").style.display = "flex";
+  lightbox.style.display = "flex";
+}
+
+function closeLightbox() {
+  lightbox.style.display = "none";
 }
 
 function showImage() {
   const img = currentImages[currentIndex];
-  const el = document.getElementById("lightboxImg");
 
-  el.src = img.full;
-  el.style.transform = "scale(1)";
+  scale = 1;
+  currentX = 0;
+  currentY = 0;
+
+  imgEl.style.transform = "translate(0px,0px) scale(1)";
+  imgEl.src = img.full;
+
   document.getElementById("sheet").innerText = img.name;
 }
 
-/* CLOSE BUTTON */
-function closeLightbox() {
-  document.getElementById("lightbox").style.display = "none";
-}
-
-/* SWIPE */
-let startX = 0;
-
-document.getElementById("lightbox").addEventListener("touchstart", e => {
-  startX = e.touches[0].clientX;
+/* CLOSE when clicking background */
+lightbox.addEventListener("click", (e) => {
+  if (e.target.id === "lightbox") {
+    closeLightbox();
+  }
 });
 
-document.getElementById("lightbox").addEventListener("touchend", e => {
+document.getElementById("prevBtn").onclick = () => {
+  if (currentIndex > 0) {
+    currentIndex--;
+    showImage();
+  }
+};
+
+document.getElementById("nextBtn").onclick = () => {
+  if (currentIndex < currentImages.length - 1) {
+    currentIndex++;
+    showImage();
+  }
+};
+
+/* ================= TOUCH START ================= */
+lightbox.addEventListener("touchstart", e => {
+  if (e.touches.length === 1) {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    isDragging = true;
+  }
+});
+
+/* ================= TOUCH MOVE ================= */
+lightbox.addEventListener("touchmove", e => {
+  if (!isDragging) return;
+
+  let x = e.touches[0].clientX;
+  let y = e.touches[0].clientY;
+
+  let dx = x - startX;
+  let dy = y - startY;
+
+  /* PAN when zoomed */
+  if (scale > 1) {
+    e.preventDefault();
+
+    currentX += dx;
+    currentY += dy;
+
+    imgEl.style.transform =
+      `translate(${currentX}px, ${currentY}px) scale(${scale})`;
+
+    startX = x;
+    startY = y;
+  }
+});
+
+/* ================= TOUCH END ================= */
+lightbox.addEventListener("touchend", e => {
+  if (!isDragging) return;
+
   let endX = e.changedTouches[0].clientX;
   let diff = startX - endX;
 
-  if (Math.abs(diff) > 50) {
+  /* SWIPE only when not zoomed */
+  if (scale === 1 && Math.abs(diff) > 50) {
     if (diff > 0 && currentIndex < currentImages.length - 1) {
       currentIndex++;
     } else if (diff < 0 && currentIndex > 0) {
@@ -302,18 +385,65 @@ document.getElementById("lightbox").addEventListener("touchend", e => {
     }
     showImage();
   }
+
+  isDragging = false;
+
+  /* DOUBLE TAP */
+  let now = new Date().getTime();
+  let gap = now - lastTap;
+
+  if (gap < 300 && gap > 0) {
+    if (scale === 1) {
+      scale = 2;
+    } else {
+      scale = 1;
+      currentX = 0;
+      currentY = 0;
+    }
+
+    imgEl.style.transform =
+      `translate(${currentX}px, ${currentY}px) scale(${scale})`;
+  }
+
+  lastTap = now;
 });
 
-/* ZOOM */
-let scale = 1;
-
-document.getElementById("lightboxImg").addEventListener("wheel", e => {
+/* ================= WHEEL ZOOM ================= */
+imgEl.addEventListener("wheel", e => {
   e.preventDefault();
+
   scale += e.deltaY * -0.001;
   scale = Math.min(Math.max(1, scale), 4);
-  e.target.style.transform = `scale(${scale})`;
+
+  imgEl.style.transform =
+    `translate(${currentX}px, ${currentY}px) scale(${scale})`;
 });
 
+/* ================= KEYBOARD NAVIGATION ================= */
+document.addEventListener("keydown", (e) => {
+  // only work when lightbox is open
+  if (lightbox.style.display !== "flex") return;
+
+  if (e.key === "ArrowRight") {
+    if (currentIndex < currentImages.length - 1) {
+      currentIndex++;
+      showImage();
+    }
+  }
+
+  if (e.key === "ArrowLeft") {
+    if (currentIndex > 0) {
+      currentIndex--;
+      showImage();
+    }
+  }
+
+  if (e.key === "Escape") {
+    closeLightbox();
+  }
+});
+
+/* ================= START ================= */
 load();
 </script>
 
