@@ -17,6 +17,10 @@ body {
   background: #f5f5f5;
 }
 
+body.no-scroll {
+  overflow: hidden; /* 🔥 disable scroll */
+}
+
 h1 {
   text-align: center;
   font-size: 20px;
@@ -205,7 +209,7 @@ h1 {
   <button class="btn" onclick="resetSearch()">reset</button>
 </div>
 
-<div id="back">⬅ Back</div>
+<div id="back" onclick="goHome()">⬅ Back</div>
 
 <div id="albums"></div>
 <div id="gallery" style="display:none;"></div>
@@ -233,12 +237,21 @@ let currentAlbum = null;
 let currentImages = [];
 let currentIndex = 0;
 
+let scale = 1;
+let startX = 0;
+let startY = 0;
+let currentX = 0;
+let currentY = 0;
+let isDragging = false;
+
+/* LOAD */
 async function load() {
   const res = await fetch(API_URL);
   allAlbums = await res.json();
   renderAlbums(allAlbums);
 }
 
+/* HOME */
 function goHome() {
   currentAlbum = null;
   renderAlbums(allAlbums);
@@ -247,6 +260,7 @@ function goHome() {
   document.getElementById("back").style.display = "none";
 }
 
+/* RENDER */
 function renderAlbums(albums) {
   const el = document.getElementById("albums");
   el.innerHTML = "";
@@ -286,8 +300,6 @@ function renderImages(images) {
   });
 }
 
-document.getElementById("back").onclick = goHome;
-
 /* SEARCH */
 function doSearch() {
   const q = document.getElementById("searchBox").value.toLowerCase();
@@ -313,30 +325,26 @@ function resetSearch() {
 const lightbox = document.getElementById("lightbox");
 const imgEl = document.getElementById("lightboxImg");
 
-let scale = 1;
-let startX = 0;
-let startY = 0;
-let currentX = 0;
-let currentY = 0;
-let isDragging = false;
-
 function openLightbox(index) {
   currentIndex = index;
   showImage();
   lightbox.style.display = "flex";
+  document.body.classList.add("no-scroll"); /* 🔥 disable scroll */
 }
 
 function closeLightbox() {
   lightbox.style.display = "none";
+  document.body.classList.remove("no-scroll"); /* 🔥 enable scroll */
 }
 
 function showImage() {
   const img = currentImages[currentIndex];
+
   scale = 1;
   currentX = 0;
   currentY = 0;
 
-  imgEl.style.transform = "translate(0,0) scale(1)";
+  updateTransform();
   imgEl.src = img.full;
   document.getElementById("sheet").innerText = img.name;
 }
@@ -356,7 +364,16 @@ function zoomOut() {
   updateTransform();
 }
 
+/* 🔥 BOUNDED PAN */
 function updateTransform() {
+  const rect = imgEl.getBoundingClientRect();
+
+  const maxX = (rect.width * (scale - 1)) / 2;
+  const maxY = (rect.height * (scale - 1)) / 2;
+
+  currentX = Math.max(-maxX, Math.min(maxX, currentX));
+  currentY = Math.max(-maxY, Math.min(maxY, currentY));
+
   imgEl.style.transform =
     `translate(${currentX}px, ${currentY}px) scale(${scale})`;
 }
